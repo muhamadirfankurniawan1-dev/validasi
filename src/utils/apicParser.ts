@@ -3,6 +3,7 @@ export interface EndpointData {
   ip: string;
   paths: string[];
   pod: string;
+  pathsWithNodes?: Map<string, string>; // path -> node mapping
 }
 
 export interface PathAttachment {
@@ -25,12 +26,23 @@ export function parseEndpointOutput(input: string): EndpointData | null {
 
   let vlan = '';
   const pathSet = new Set<string>();
+  const pathNodeMap = new Map<string, string>();
 
   for (const line of lines) {
-    // Extract VLAN
+    // Extract VLAN (from either "vlan-713" or "Encap" column)
     const vlanMatch = line.match(/vlan-(\d+)/i);
     if (vlanMatch) {
       vlan = vlanMatch[1];
+    }
+
+    // Extract Node and Interface to construct path
+    // Format: Node=303, Interface=eth1/5 -> path: eth1/5
+    const nodeInterfaceMatch = line.match(/(\d+)\s+(eth\d+\/\d+)\s+vlan-(\d+)/i);
+    if (nodeInterfaceMatch) {
+      const node = nodeInterfaceMatch[1];
+      const interface_ = nodeInterfaceMatch[2];
+      pathSet.add(interface_);
+      pathNodeMap.set(interface_, node);
     }
 
     // Extract VPC paths - support multiple formats
@@ -54,7 +66,8 @@ export function parseEndpointOutput(input: string): EndpointData | null {
       vlan,
       ip: '',
       paths: Array.from(pathSet),
-      pod: ''
+      pod: '',
+      pathsWithNodes: pathNodeMap
     };
   }
 

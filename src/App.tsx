@@ -122,17 +122,29 @@ function App() {
               } else if (num >= 400 && num < 500) {
                 return 'pod-2';
               }
-              // If from moquery data, use that pod
-              const normalizedPathName = result.path.trim().replace(/[\[\]]/g, '').toLowerCase();
-              for (const attachment of pathAttachments) {
-                const attachmentPath = attachment.path.trim().replace(/[\[\]]/g, '').toLowerCase();
-                if (attachmentPath === normalizedPathName) {
-                  return attachment.pod;
-                }
-              }
               return 'pod-2'; // fallback
             };
 
+            // First, try to find exact match in moquery data
+            const normalizedPathName = result.path.trim().replace(/[\[\]]/g, '').toLowerCase();
+            let matchedAttachment: typeof pathAttachments[0] | null = null;
+
+            for (const attachment of pathAttachments) {
+              const attachmentPath = attachment.path.trim().replace(/[\[\]]/g, '').toLowerCase();
+              if (attachmentPath === normalizedPathName) {
+                matchedAttachment = attachment;
+                fullPath = attachment.fullPath;
+                break;
+              }
+            }
+
+            // If exact match found, use it
+            if (matchedAttachment) {
+              allRows.push(`${vlanNumber},${epgFormatted},${fullPath}`);
+              return;
+            }
+
+            // Otherwise, construct the path
             // Check if it's a VPC path (format: XXX-YYY-VPC-...)
             const vpcMatch = result.path.match(/(\d+)-(\d+)-VPC/);
             if (vpcMatch) {
@@ -141,14 +153,20 @@ function App() {
               pod = determinePodByNode(node1);
               fullPath = `${pod}/protpaths-${node1}-${node2}/pathep-[${result.path}]`;
             } else {
-              // Single path (format: node-port)
+              // Single path - could be "eth1/5" format
               const singleMatch = result.path.match(/^(\d+)[-\/]/);
               if (singleMatch) {
+                // Path like "303/eth1/5" or "303-something"
                 const node = singleMatch[1];
                 pod = determinePodByNode(node);
                 fullPath = `${pod}/paths-${node}/pathep-[${result.path}]`;
+              } else if (entry.endpointData?.pathsWithNodes?.has(result.path)) {
+                // Path like "eth1/5" - get node from pathsWithNodes map
+                const node = entry.endpointData.pathsWithNodes.get(result.path)!;
+                pod = determinePodByNode(node);
+                fullPath = `${pod}/paths-${node}/pathep-[${result.path}]`;
               } else {
-                // Fallback
+                // Fallback - can't determine node
                 fullPath = `${pod}/paths-XXX/pathep-[${result.path}]`;
               }
             }
