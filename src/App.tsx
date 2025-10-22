@@ -114,27 +114,38 @@ function App() {
             let fullPath = '';
             let pod = 'pod-2'; // default fallback
 
-            // Find pod from moquery data
-            const normalizedPathName = result.path.trim().replace(/[\[\]]/g, '').toLowerCase();
-            for (const attachment of pathAttachments) {
-              const attachmentPath = attachment.path.trim().replace(/[\[\]]/g, '').toLowerCase();
-              if (attachmentPath === normalizedPathName) {
-                pod = attachment.pod;
-                break;
+            // Determine pod based on node number range
+            const determinePodByNode = (nodeNum: string): string => {
+              const num = parseInt(nodeNum);
+              if (num >= 300 && num < 400) {
+                return 'pod-1';
+              } else if (num >= 400 && num < 500) {
+                return 'pod-2';
               }
-            }
+              // If from moquery data, use that pod
+              const normalizedPathName = result.path.trim().replace(/[\[\]]/g, '').toLowerCase();
+              for (const attachment of pathAttachments) {
+                const attachmentPath = attachment.path.trim().replace(/[\[\]]/g, '').toLowerCase();
+                if (attachmentPath === normalizedPathName) {
+                  return attachment.pod;
+                }
+              }
+              return 'pod-2'; // fallback
+            };
 
             // Check if it's a VPC path (format: XXX-YYY-VPC-...)
             const vpcMatch = result.path.match(/(\d+)-(\d+)-VPC/);
             if (vpcMatch) {
               const node1 = vpcMatch[1];
               const node2 = vpcMatch[2];
+              pod = determinePodByNode(node1);
               fullPath = `${pod}/protpaths-${node1}-${node2}/pathep-[${result.path}]`;
             } else {
               // Single path (format: node-port)
               const singleMatch = result.path.match(/^(\d+)[-\/]/);
               if (singleMatch) {
                 const node = singleMatch[1];
+                pod = determinePodByNode(node);
                 fullPath = `${pod}/paths-${node}/pathep-[${result.path}]`;
               } else {
                 // Fallback
