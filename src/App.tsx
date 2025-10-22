@@ -102,7 +102,12 @@ function App() {
         const notAllowed = entry.results.filter(r => r.status === 'not_allowed');
         if (notAllowed.length > 0) {
           const vlanNumber = extractVlanFromEpg(entry.epgName) || entry.endpointData!.vlan;
-          const epgFormatted = entry.epgName.toLowerCase().startsWith('epg-') ? entry.epgName : `epg-${entry.epgName}`;
+
+          // Format EPG: use as-is if it already starts with "EPG-", otherwise add "EPG-" prefix
+          let epgFormatted = entry.epgName;
+          if (!epgFormatted.toUpperCase().startsWith('EPG-')) {
+            epgFormatted = `EPG-${entry.epgName}`;
+          }
 
           notAllowed.forEach(result => {
             // Generate full path in moquery format
