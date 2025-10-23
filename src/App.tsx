@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Network, Download, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import ValidationTable from './components/ValidationTable';
+import MatrixTable from './components/MatrixTable';
 import {
   parseEndpointOutput,
   parseMoqueryOutput,
@@ -328,6 +329,19 @@ function App() {
             </div>
           )
         ))}
+
+        {entries.some(e => e.results && e.endpointData) && (
+          <MatrixTable
+            allEntries={entries
+              .filter(e => e.results && e.endpointData)
+              .map(e => ({
+                vlan: e.endpointData!.vlan,
+                epgName: e.epgName,
+                results: e.results!
+              }))}
+            pathAttachments={pathAttachments}
+          />
+        )}
       </div>
     </div>
   );
