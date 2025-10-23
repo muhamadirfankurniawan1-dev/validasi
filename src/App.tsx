@@ -337,7 +337,8 @@ function App() {
               .map(e => ({
                 vlan: e.endpointData!.vlan,
                 epgName: e.epgName,
-                results: e.results!
+                results: e.results!,
+                endpointData: e.endpointData!
               }))}
             pathAttachments={pathAttachments}
           />
