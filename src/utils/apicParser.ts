@@ -25,10 +25,19 @@ export function parseEndpointOutput(input: string): EndpointData | null {
   const lines = input.trim().split('\n');
 
   let vlan = '';
+  let ip = '';
   const pathSet = new Set<string>();
   const pathNodeMap = new Map<string, string>();
 
   for (const line of lines) {
+    // Extract IP address - look for valid IP format
+    if (!ip) {
+      const ipMatch = line.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/);
+      if (ipMatch) {
+        ip = ipMatch[1];
+      }
+    }
+
     // Extract VLAN (from either "vlan-713" or "Encap" column)
     const vlanMatch = line.match(/vlan-(\d+)/i);
     if (vlanMatch) {
@@ -64,7 +73,7 @@ export function parseEndpointOutput(input: string): EndpointData | null {
   if (vlan && pathSet.size > 0) {
     return {
       vlan,
-      ip: '',
+      ip: ip,
       paths: Array.from(pathSet),
       pod: '',
       pathsWithNodes: pathNodeMap
