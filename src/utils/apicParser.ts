@@ -25,47 +25,66 @@ export function parseEndpointOutput(input: string): EndpointData | null {
   const lines = input.trim().split('\n');
 
   let vlan = '';
-  let ip = '';
+  let defaultIp = '';
   const pathSet = new Set<string>();
   const pathNodeMap = new Map<string, string>();
+  const pathIPMap = new Map<string, string>();
 
   for (const line of lines) {
-    // Extract IP address - look for valid IP format
-    if (!ip) {
-      const ipMatch = line.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/);
-      if (ipMatch) {
-        ip = ipMatch[1];
-      }
+    // Skip empty lines and headers
+    if (!line.trim() || line.includes('Node') && line.includes('Interface')) {
+      continue;
+    }
+
+    // Extract IP address from the current line
+    const ipMatch = line.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/);
+    const currentLineIP = ipMatch ? ipMatch[1] : '';
+
+    // Set default IP from first valid occurrence
+    if (currentLineIP && !defaultIp) {
+      defaultIp = currentLineIP;
     }
 
     // Extract VLAN (from either "vlan-713" or "Encap" column)
     const vlanMatch = line.match(/vlan-(\d+)/i);
-    if (vlanMatch) {
+    if (vlanMatch && !vlan) {
       vlan = vlanMatch[1];
     }
 
     // Extract Node and Interface to construct path
     // Format: Node=303, Interface=eth1/5 -> path: eth1/5
-    const nodeInterfaceMatch = line.match(/(\d+)\s+(eth\d+\/\d+)\s+vlan-(\d+)/i);
+    const nodeInterfaceMatch = line.match(/(\d+)\s+(eth\d+\/\d+)\s+.*vlan-(\d+)/i);
     if (nodeInterfaceMatch) {
       const node = nodeInterfaceMatch[1];
       const interface_ = nodeInterfaceMatch[2];
       pathSet.add(interface_);
       pathNodeMap.set(interface_, node);
+
+      // Associate this path with its IP
+      if (currentLineIP) {
+        pathIPMap.set(interface_, currentLineIP);
+      }
     }
 
     // Extract VPC paths - support multiple formats
-    // Format 1: vpc 425-426-VPC-31-32-PG
-    let vpcMatch = line.match(/vpc\s+([\d-]+-VPC-[\d-]+-PG)/i);
-    if (vpcMatch) {
-      pathSet.add(vpcMatch[1]);
-    }
+    // Format 1: vpc 425-426-VPC-31-32-PG or just 425-426-VPC-31-32-PG
+    const vpcPatterns = [
+      /vpc\s+([\d-]+-VPC-[\d-]+-PG)/i,
+      /\b([\d]+-[\d]+-VPC-[\d]+-[\d]+-PG)\b/i,
+      /([\d]+-[\d]+-VPC-[\d]+-[\d]+-PG)/i
+    ];
 
-    // Format 2: VPC path without "vpc" prefix
-    if (!vpcMatch) {
-      vpcMatch = line.match(/\b([\d-]+-[\d-]+-VPC-[\d-]+-[\d-]+-PG)\b/i);
+    for (const pattern of vpcPatterns) {
+      const vpcMatch = line.match(pattern);
       if (vpcMatch) {
-        pathSet.add(vpcMatch[1]);
+        const vpcPath = vpcMatch[1];
+        pathSet.add(vpcPath);
+
+        // Associate this VPC path with its IP
+        if (currentLineIP) {
+          pathIPMap.set(vpcPath, currentLineIP);
+        }
+        break;
       }
     }
   }
@@ -73,10 +92,11 @@ export function parseEndpointOutput(input: string): EndpointData | null {
   if (vlan && pathSet.size > 0) {
     return {
       vlan,
-      ip: ip,
+      ip: defaultIp,
       paths: Array.from(pathSet),
       pod: '',
-      pathsWithNodes: pathNodeMap
+      pathsWithNodes: pathNodeMap,
+      pathsWithIPs: pathIPMap
     };
   }
 
